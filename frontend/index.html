@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100" xmlns:x-transition="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Scraper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.5/gsap.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="h-full" x-data="scraper()">
+    <div class="min-h-full">
+        <nav class="bg-gray-800">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <img class="h-8 w-8" src="https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500" alt="Your Company">
+                        </div>
+                        <div class="ml-10 flex items-baseline space-x-4">
+                            <a href="#" class="bg-gray-900 text-white rounded-md px-3 py-2 text-sm font-medium" aria-current="page">Job Scraper</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <header class="bg-white shadow">
+            <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                <h1 class="text-3xl font-bold tracking-tight text-gray-900">Job Listings Scraper</h1>
+            </div>
+        </header>
+
+        <main>
+            <div class="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
+                <div class="px-4 py-6 sm:px-0">
+                    <div class="rounded-lg border-4 border-dashed border-gray-200 p-4 sm:p-6 lg:p-8">
+                        <form id="scraperForm" @submit.prevent="scrapeJobs" class="space-y-6">
+                            <div>
+                                <label for="url" class="block text-sm font-medium leading-6 text-gray-900">Job Website URL</label>
+                                <div class="mt-2">
+                                    <input type="text" x-model="url" id="url" required class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+                                </div>
+                            </div>
+                            <div>
+                                <button type="submit" :disabled="isLoading" class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span x-show="!isLoading">Scrape Jobs</span>
+                                    <span x-show="isLoading" class="inline-flex items-center">
+                                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Processing...
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                        <div x-show="status" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-90" x-transition:enter-end="opacity-100 transform scale-100" class="mt-4 p-4 rounded-md" :class="{'bg-green-100 text-green-700': !error, 'bg-red-100 text-red-700': error}">
+                            <p x-text="status"></p>
+                        </div>
+                        <div x-show="csvUrl" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-90" x-transition:enter-end="opacity-100 transform scale-100" class="mt-4">
+                            <a :href="csvUrl" download class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Download CSV
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function scraper() {
+            return {
+                url: '',
+                status: '',
+                csvUrl: '',
+                isLoading: false,
+                error: false,
+                async scrapeJobs() {
+                    this.isLoading = true;
+                    this.status = "Scraping in progress...";
+                    this.csvUrl = '';
+                    this.error = false;
+
+                    try {
+                        const response = await fetch('/scrape', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: this.url }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Scraping failed. Please try again.');
+                        }
+
+                        const data = await response.json();
+                        this.status = data.message;
+                        this.csvUrl = data.csv_url;
+                    } catch (error) {
+                        this.status = error.message;
+                        this.error = true;
+                    } finally {
+                        this.isLoading = false;
+                        this.animateStatus();
+                    }
+                },
+                animateStatus() {
+                    gsap.from("#status", {
+                        opacity: 0,
+                        y: -20,
+                        duration: 0.5,
+                        ease: "power2.out"
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
